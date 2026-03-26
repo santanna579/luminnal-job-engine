@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from app.schemas import JobInput, JobAnalysisResponse
-from app.services import analisar_vaga_texto
+from app.schemas import JobInput, JobAnalysisResponse, JobWithProfileInput
+from app.services import analisar_vaga_texto, analisar_com_perfil
 
 app = FastAPI(
     title="Luminnal Job Engine",
@@ -22,4 +22,13 @@ def health_check():
 @app.post("/analisar-vaga", response_model=JobAnalysisResponse)
 def analisar_vaga(job: JobInput):
     resultado = analisar_vaga_texto(job.descricao)
+    return resultado
+
+
+@app.post("/analisar-vaga-com-perfil", response_model=JobAnalysisResponse)
+def analisar_vaga_com_perfil(data: JobWithProfileInput):
+    resultado = analisar_com_perfil(
+        data.vaga.descricao,
+        data.candidato.skills
+    )
     return resultado

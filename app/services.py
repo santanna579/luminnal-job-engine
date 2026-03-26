@@ -58,3 +58,37 @@ def analisar_vaga_texto(descricao: str) -> Dict:
         "gaps_identificados": gaps,
         "recomendacao": recomendacao,
     }
+
+
+def analisar_com_perfil(descricao: str, skills_candidato: List[str]) -> Dict:
+    descricao_lower = descricao.lower()
+    skills_lower = [s.lower() for s in skills_candidato]
+
+    matches = []
+    gaps = []
+
+    for skill in skills_lower:
+        if skill in descricao_lower:
+            matches.append(skill)
+        else:
+            gaps.append(skill)
+
+    score = int((len(matches) / max(len(skills_lower), 1)) * 100)
+
+    if score >= 70:
+        nivel = "alta"
+        recomendacao = "Aplicar com confiança"
+    elif score >= 40:
+        nivel = "media"
+        recomendacao = "Aplicar com ajustes no currículo"
+    else:
+        nivel = "baixa"
+        recomendacao = "Baixa aderência"
+
+    return {
+        "score": score,
+        "nivel_aderencia": nivel,
+        "palavras_chave_encontradas": matches,
+        "gaps_identificados": gaps,
+        "recomendacao": recomendacao,
+    }

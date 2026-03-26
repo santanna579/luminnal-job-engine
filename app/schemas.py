@@ -15,3 +15,17 @@ class JobAnalysisResponse(BaseModel):
     palavras_chave_encontradas: List[str]
     gaps_identificados: List[str]
     recomendacao: str
+
+
+class CandidateProfile(BaseModel):
+    nome: str
+    cargo_atual: str
+    anos_experiencia: int
+    skills: List[str]
+    nivel_ingles: str
+    objetivo: str
+
+
+class JobWithProfileInput(BaseModel):
+    vaga: JobInput
+    candidato: CandidateProfile
