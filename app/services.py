@@ -1,5 +1,9 @@
 from typing import List, Dict
-
+import json
+from sqlalchemy.orm import Session
+from app.models import CandidateProfileModel
+from app.models_job import JobPostingModel
+from app.models_match import JobMatchModel
 
 PALAVRAS_CHAVE_BASE = [
     "python",
@@ -183,3 +187,225 @@ def salvar_perfil_candidato(perfil: Dict) -> Dict:
 
 def obter_perfil_candidato() -> Dict | None:
     return perfil_candidato_storage
+
+def salvar_perfil_candidato_db(db: Session, perfil: Dict) -> Dict:
+    perfil_existente = db.query(CandidateProfileModel).first()
+
+    skills_json = json.dumps(perfil["skills"], ensure_ascii=False)
+
+    if perfil_existente:
+        perfil_existente.nome = perfil["nome"]
+        perfil_existente.cargo_atual = perfil["cargo_atual"]
+        perfil_existente.anos_experiencia = perfil["anos_experiencia"]
+        perfil_existente.skills = skills_json
+        perfil_existente.nivel_ingles = perfil["nivel_ingles"]
+        perfil_existente.objetivo = perfil["objetivo"]
+        db.commit()
+        db.refresh(perfil_existente)
+        return {
+            "nome": perfil_existente.nome,
+            "cargo_atual": perfil_existente.cargo_atual,
+            "anos_experiencia": perfil_existente.anos_experiencia,
+            "skills": json.loads(perfil_existente.skills),
+            "nivel_ingles": perfil_existente.nivel_ingles,
+            "objetivo": perfil_existente.objetivo,
+        }
+
+    novo_perfil = CandidateProfileModel(
+        nome=perfil["nome"],
+        cargo_atual=perfil["cargo_atual"],
+        anos_experiencia=perfil["anos_experiencia"],
+        skills=skills_json,
+        nivel_ingles=perfil["nivel_ingles"],
+        objetivo=perfil["objetivo"],
+    )
+
+    db.add(novo_perfil)
+    db.commit()
+    db.refresh(novo_perfil)
+
+    return {
+        "nome": novo_perfil.nome,
+        "cargo_atual": novo_perfil.cargo_atual,
+        "anos_experiencia": novo_perfil.anos_experiencia,
+        "skills": json.loads(novo_perfil.skills),
+        "nivel_ingles": novo_perfil.nivel_ingles,
+        "objetivo": novo_perfil.objetivo,
+    }
+
+
+def obter_perfil_candidato_db(db: Session) -> Dict | None:
+    perfil = db.query(CandidateProfileModel).first()
+
+    if not perfil:
+        return None
+
+    return {
+        "nome": perfil.nome,
+        "cargo_atual": perfil.cargo_atual,
+        "anos_experiencia": perfil.anos_experiencia,
+        "skills": json.loads(perfil.skills),
+        "nivel_ingles": perfil.nivel_ingles,
+        "objetivo": perfil.objetivo,
+    }
+
+def salvar_vaga_db(db: Session, vaga: Dict) -> Dict:
+    nova_vaga = JobPostingModel(
+        titulo=vaga["titulo"],
+        empresa=vaga["empresa"],
+        localizacao=vaga.get("localizacao"),
+        origem=vaga.get("origem", "linkedin"),
+        url=vaga.get("url"),
+        descricao=vaga["descricao"],
+    )
+
+    db.add(nova_vaga)
+    db.commit()
+    db.refresh(nova_vaga)
+
+    return {
+        "id": nova_vaga.id,
+        "titulo": nova_vaga.titulo,
+        "empresa": nova_vaga.empresa,
+        "localizacao": nova_vaga.localizacao,
+        "origem": nova_vaga.origem,
+        "url": nova_vaga.url,
+        "descricao": nova_vaga.descricao,
+        "criado_em": nova_vaga.criado_em,
+    }
+
+
+def listar_vagas_db(db: Session) -> List[Dict]:
+    vagas = db.query(JobPostingModel).order_by(JobPostingModel.id.desc()).all()
+
+    return [
+        {
+            "id": vaga.id,
+            "titulo": vaga.titulo,
+            "empresa": vaga.empresa,
+            "localizacao": vaga.localizacao,
+            "origem": vaga.origem,
+            "url": vaga.url,
+            "descricao": vaga.descricao,
+            "criado_em": vaga.criado_em,
+        }
+        for vaga in vagas
+    ]
+
+
+def obter_vaga_db(db: Session, vaga_id: int) -> Dict | None:
+    vaga = db.query(JobPostingModel).filter(JobPostingModel.id == vaga_id).first()
+
+    if not vaga:
+        return None
+
+    return {
+        "id": vaga.id,
+        "titulo": vaga.titulo,
+        "empresa": vaga.empresa,
+        "localizacao": vaga.localizacao,
+        "origem": vaga.origem,
+        "url": vaga.url,
+        "descricao": vaga.descricao,
+        "criado_em": vaga.criado_em,
+    }
+
+def salvar_job_match_db(db: Session, vaga_id: int, nome_candidato: str, resultado: Dict) -> Dict:
+    novo_match = JobMatchModel(
+        vaga_id=vaga_id,
+        nome_candidato=nome_candidato,
+        score=resultado["score"],
+        score_skills=resultado["score_skills"],
+        score_senioridade=resultado["score_senioridade"],
+        score_ingles=resultado["score_ingles"],
+        nivel_aderencia=resultado["nivel_aderencia"],
+        palavras_chave_encontradas=json.dumps(
+            resultado["palavras_chave_encontradas"],
+            ensure_ascii=False
+        ),
+        skills_nao_relevantes=json.dumps(
+            resultado["skills_do_candidato_nao_relevantes_para_esta_vaga"],
+            ensure_ascii=False
+        ),
+        exigencias_nao_cobertas=json.dumps(
+            resultado["exigencias_da_vaga_nao_cobertas"],
+            ensure_ascii=False
+        ),
+        recomendacao=resultado["recomendacao"],
+        resumo_analitico=resultado["resumo_analitico"],
+    )
+
+    db.add(novo_match)
+    db.commit()
+    db.refresh(novo_match)
+
+    return {
+        "id": novo_match.id,
+        "vaga_id": novo_match.vaga_id,
+        "nome_candidato": novo_match.nome_candidato,
+        "score": novo_match.score,
+        "score_skills": novo_match.score_skills,
+        "score_senioridade": novo_match.score_senioridade,
+        "score_ingles": novo_match.score_ingles,
+        "nivel_aderencia": novo_match.nivel_aderencia,
+        "palavras_chave_encontradas": json.loads(novo_match.palavras_chave_encontradas) if novo_match.palavras_chave_encontradas else [],
+        "skills_do_candidato_nao_relevantes_para_esta_vaga": json.loads(novo_match.skills_nao_relevantes) if novo_match.skills_nao_relevantes else [],
+        "exigencias_da_vaga_nao_cobertas": json.loads(novo_match.exigencias_nao_cobertas) if novo_match.exigencias_nao_cobertas else [],
+        "recomendacao": novo_match.recomendacao,
+        "resumo_analitico": novo_match.resumo_analitico,
+        "criado_em": novo_match.criado_em,
+    }
+
+
+def listar_job_matches_db(db: Session) -> List[Dict]:
+    matches = db.query(JobMatchModel).order_by(JobMatchModel.id.desc()).all()
+
+    return [
+        {
+            "id": match.id,
+            "vaga_id": match.vaga_id,
+            "nome_candidato": match.nome_candidato,
+            "score": match.score,
+            "score_skills": match.score_skills,
+            "score_senioridade": match.score_senioridade,
+            "score_ingles": match.score_ingles,
+            "nivel_aderencia": match.nivel_aderencia,
+            "palavras_chave_encontradas": json.loads(match.palavras_chave_encontradas) if match.palavras_chave_encontradas else [],
+            "skills_do_candidato_nao_relevantes_para_esta_vaga": json.loads(match.skills_nao_relevantes) if match.skills_nao_relevantes else [],
+            "exigencias_da_vaga_nao_cobertas": json.loads(match.exigencias_nao_cobertas) if match.exigencias_nao_cobertas else [],
+            "recomendacao": match.recomendacao,
+            "resumo_analitico": match.resumo_analitico,
+            "criado_em": match.criado_em,
+        }
+        for match in matches
+    ]
+
+def recomendar_vagas_para_perfil(db: Session, perfil: Dict) -> List[Dict]:
+    vagas = db.query(JobPostingModel).order_by(JobPostingModel.id.desc()).all()
+
+    recomendacoes = []
+
+    for vaga in vagas:
+        resultado = analisar_com_perfil(
+            vaga.descricao,
+            perfil["skills"],
+            perfil["nivel_ingles"],
+            perfil["anos_experiencia"]
+        )
+
+        recomendacoes.append({
+            "vaga_id": vaga.id,
+            "titulo": vaga.titulo,
+            "empresa": vaga.empresa,
+            "localizacao": vaga.localizacao,
+            "origem": vaga.origem,
+            "url": vaga.url,
+            "score": resultado["score"],
+            "nivel_aderencia": resultado["nivel_aderencia"],
+            "recomendacao": resultado["recomendacao"],
+            "resumo_analitico": resultado["resumo_analitico"],
+        })
+
+    recomendacoes.sort(key=lambda x: x["score"], reverse=True)
+
+    return recomendacoes
