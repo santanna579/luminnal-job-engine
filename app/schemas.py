@@ -11,10 +11,15 @@ class JobInput(BaseModel):
 
 class JobAnalysisResponse(BaseModel):
     score: int
+    score_skills: int
+    score_senioridade: int
+    score_ingles: int
     nivel_aderencia: str
     palavras_chave_encontradas: List[str]
-    gaps_identificados: List[str]
+    skills_do_candidato_nao_relevantes_para_esta_vaga: List[str]
+    exigencias_da_vaga_nao_cobertas: List[str]
     recomendacao: str
+    resumo_analitico: str
 
 
 class CandidateProfile(BaseModel):
