@@ -37,6 +37,23 @@ def consultar_perfil_candidato():
     return perfil
 
 
+@app.post("/analisar-vaga-usando-perfil-salvo", response_model=JobAnalysisResponse)
+def analisar_vaga_usando_perfil_salvo(job: JobInput):
+    perfil = obter_perfil_candidato()
+
+    if not perfil:
+        raise HTTPException(status_code=404, detail="Perfil do candidato não cadastrado")
+
+    resultado = analisar_com_perfil(
+        job.descricao,
+        perfil["skills"],
+        perfil["nivel_ingles"],
+        perfil["anos_experiencia"]
+    )
+
+    return resultado
+
+
 @app.post("/analisar-vaga", response_model=JobAnalysisResponse)
 def analisar_vaga(job: JobInput):
     resultado = analisar_vaga_texto(job.descricao)
