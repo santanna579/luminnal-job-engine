@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
-from typing import Optional
+from typing import List, Optional, Any
 from datetime import datetime
 
 class JobCreate(BaseModel):
@@ -90,3 +89,95 @@ class RecommendedJobResponse(BaseModel):
     nivel_aderencia: str
     recomendacao: str
     resumo_analitico: str
+
+
+class CandidateProfileRawInput(BaseModel):
+    nome: str
+    cargo_atual: str
+    anos_experiencia: int
+    skills: List[str]
+    nivel_ingles: str
+    objetivo: str
+    raw_resume_text: str
+    profile_json: Optional[str] = None
+    profile_summary: Optional[str] = None
+
+
+class CandidateProfileRawResponse(BaseModel):
+    nome: str
+    cargo_atual: str
+    anos_experiencia: int
+    skills: List[str]
+    nivel_ingles: str
+    objetivo: str
+    raw_resume_text: Optional[str] = None
+    profile_json: Optional[str] = None
+    profile_summary: Optional[str] = None
+
+
+class JobRawInput(BaseModel):
+    titulo: str
+    empresa: str
+    localizacao: Optional[str] = None
+    origem: str = "linkedin"
+    url: Optional[str] = None
+    descricao: str
+    raw_description: Optional[str] = None
+    job_json: Optional[str] = None
+    job_summary: Optional[str] = None
+
+
+class JobRawResponse(BaseModel):
+    id: int
+    titulo: str
+    empresa: str
+    localizacao: Optional[str] = None
+    origem: str
+    url: Optional[str] = None
+    descricao: str
+    raw_description: Optional[str] = None
+    job_json: Optional[str] = None
+    job_summary: Optional[str] = None
+    criado_em: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CandidateProfileProcessedResponse(BaseModel):
+    nome: str
+    cargo_atual: str
+    anos_experiencia: int
+    skills: List[str]
+    nivel_ingles: str
+    objetivo: str
+    raw_resume_text: Optional[str] = None
+    profile_json: Optional[Any] = None
+    profile_summary: Optional[str] = None
+
+
+class JobProcessedResponse(BaseModel):
+    id: int
+    titulo: str
+    empresa: str
+    localizacao: Optional[str] = None
+    origem: str
+    url: Optional[str] = None
+    descricao: str
+    raw_description: Optional[str] = None
+    job_json: Optional[Any] = None
+    job_summary: Optional[str] = None
+    criado_em: datetime
+
+    class Config:
+        from_attributes = True
+
+class SemanticMatchResponse(BaseModel):
+    score: int
+    skills_em_comum: List[str]
+    skills_faltantes: List[str]
+    forcas_transferiveis: List[str]
+    senioridade_compativel: bool
+    ingles_compativel: bool
+    recomendacao: str
+    resumo_match_semantico: str

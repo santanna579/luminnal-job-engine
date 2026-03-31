@@ -12,17 +12,41 @@ from app.services import (
     obter_vaga_db,
     salvar_job_match_db,
     listar_job_matches_db,
-    recomendar_vagas_para_perfil
+    recomendar_vagas_para_perfil,
+    salvar_perfil_candidato_raw_db,
+    obter_perfil_candidato_raw_db,
+    salvar_vaga_raw_db,
+    obter_vaga_raw_db,
+    processar_perfil_raw_db,
+    processar_vaga_raw_db,
+    processar_match_semantico_db
 )
 from app.models_job import JobPostingModel
 from app.models_match import JobMatchModel
-from app.schemas import JobInput, JobAnalysisResponse, JobWithProfileInput, CandidateProfile, JobCreate, JobResponse, JobMatchResponse, RecommendedJobResponse
+from app.schemas import (
+    JobInput, 
+    JobAnalysisResponse, 
+    JobWithProfileInput, 
+    CandidateProfile, 
+    JobCreate, 
+    JobResponse, 
+    JobMatchResponse, 
+    RecommendedJobResponse,
+    CandidateProfileRawInput,
+    CandidateProfileRawResponse,
+    JobRawInput,
+    JobRawResponse,
+    CandidateProfileProcessedResponse,
+    JobProcessedResponse,
+    SemanticMatchResponse
+)
+from app.core.config import settings
 
 
 app = FastAPI(
-    title="Luminnal Job Engine",
+    title=settings.app_name,
     description="API inicial do motor de vagas da Luminnal",
-    version="0.1.0"
+    version=settings.app_version
 )
 
 Base.metadata.create_all(bind=engine)
@@ -132,3 +156,63 @@ def vagas_recomendadas(db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Perfil do candidato não cadastrado")
 
     return recomendar_vagas_para_perfil(db, perfil)
+
+@app.post("/perfil-candidato/raw", response_model=CandidateProfileRawResponse)
+def criar_perfil_candidato_raw(perfil: CandidateProfileRawInput, db: Session = Depends(get_db)):
+    return salvar_perfil_candidato_raw_db(db, perfil.model_dump())
+
+
+@app.get("/perfil-candidato/raw", response_model=CandidateProfileRawResponse)
+def consultar_perfil_candidato_raw(db: Session = Depends(get_db)):
+    perfil = obter_perfil_candidato_raw_db(db)
+    if not perfil:
+        raise HTTPException(status_code=404, detail="Perfil do candidato não cadastrado")
+    return perfil
+
+@app.post("/vaga/raw", response_model=JobRawResponse)
+def criar_vaga_raw(vaga: JobRawInput, db: Session = Depends(get_db)):
+    return salvar_vaga_raw_db(db, vaga.model_dump())
+
+
+@app.get("/vaga/{vaga_id}", response_model=JobRawResponse)
+def consultar_vaga_raw(vaga_id: int, db: Session = Depends(get_db)):
+    vaga = obter_vaga_raw_db(db, vaga_id)
+    if not vaga:
+        raise HTTPException(status_code=404, detail="Vaga não encontrada")
+    return vaga
+
+@app.post("/perfil-candidato/processar-raw", response_model=CandidateProfileProcessedResponse)
+def processar_perfil_candidato_raw(db: Session = Depends(get_db)):
+    perfil = processar_perfil_raw_db(db)
+
+    if not perfil:
+        raise HTTPException(
+            status_code=404,
+            detail="Perfil do candidato com raw_resume_text não encontrado"
+        )
+
+    return perfil
+
+@app.post("/vaga/processar-raw/{vaga_id}", response_model=JobProcessedResponse)
+def processar_vaga_raw(vaga_id: int, db: Session = Depends(get_db)):
+    vaga = processar_vaga_raw_db(db, vaga_id)
+
+    if not vaga:
+        raise HTTPException(
+            status_code=404,
+            detail="Vaga com descrição bruta não encontrada"
+        )
+
+    return vaga
+
+@app.post("/match-semantico/{vaga_id}", response_model=SemanticMatchResponse)
+def match_semantico(vaga_id: int, db: Session = Depends(get_db)):
+    resultado = processar_match_semantico_db(db, vaga_id)
+
+    if not resultado:
+        raise HTTPException(
+            status_code=404,
+            detail="Perfil processado ou vaga processada não encontrados"
+        )
+
+    return resultado

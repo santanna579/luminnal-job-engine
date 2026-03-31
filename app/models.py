@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, Integer, String, Text, DateTime
+from datetime import datetime
 
 from app.database import Base
 
@@ -13,3 +14,9 @@ class CandidateProfileModel(Base):
     skills = Column(Text, nullable=False)
     nivel_ingles = Column(String(50), nullable=False)
     objetivo = Column(String(100), nullable=False)
+
+    raw_resume_text = Column(Text, nullable=True)
+    profile_json = Column(Text, nullable=True)
+    profile_summary = Column(Text, nullable=True)
+    last_ai_processed_at = Column(DateTime, nullable=True)
+    criado_em = Column(DateTime, default=datetime.utcnow)

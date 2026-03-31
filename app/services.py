@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models import CandidateProfileModel
 from app.models_job import JobPostingModel
 from app.models_match import JobMatchModel
+from datetime import datetime
 
 PALAVRAS_CHAVE_BASE = [
     "python",
@@ -409,3 +410,236 @@ def recomendar_vagas_para_perfil(db: Session, perfil: Dict) -> List[Dict]:
     recomendacoes.sort(key=lambda x: x["score"], reverse=True)
 
     return recomendacoes
+
+def salvar_perfil_candidato_raw_db(db: Session, perfil: Dict) -> Dict:
+    perfil_existente = db.query(CandidateProfileModel).first()
+
+    skills_json = json.dumps(perfil["skills"], ensure_ascii=False)
+
+    if perfil_existente:
+        perfil_existente.nome = perfil["nome"]
+        perfil_existente.cargo_atual = perfil["cargo_atual"]
+        perfil_existente.anos_experiencia = perfil["anos_experiencia"]
+        perfil_existente.skills = skills_json
+        perfil_existente.nivel_ingles = perfil["nivel_ingles"]
+        perfil_existente.objetivo = perfil["objetivo"]
+        perfil_existente.raw_resume_text = perfil.get("raw_resume_text")
+        perfil_existente.profile_json = perfil.get("profile_json")
+        perfil_existente.profile_summary = perfil.get("profile_summary")
+
+        db.commit()
+        db.refresh(perfil_existente)
+
+        return {
+            "nome": perfil_existente.nome,
+            "cargo_atual": perfil_existente.cargo_atual,
+            "anos_experiencia": perfil_existente.anos_experiencia,
+            "skills": json.loads(perfil_existente.skills),
+            "nivel_ingles": perfil_existente.nivel_ingles,
+            "objetivo": perfil_existente.objetivo,
+            "raw_resume_text": perfil_existente.raw_resume_text,
+            "profile_json": perfil_existente.profile_json,
+            "profile_summary": perfil_existente.profile_summary,
+        }
+
+    novo_perfil = CandidateProfileModel(
+        nome=perfil["nome"],
+        cargo_atual=perfil["cargo_atual"],
+        anos_experiencia=perfil["anos_experiencia"],
+        skills=skills_json,
+        nivel_ingles=perfil["nivel_ingles"],
+        objetivo=perfil["objetivo"],
+        raw_resume_text=perfil.get("raw_resume_text"),
+        profile_json=perfil.get("profile_json"),
+        profile_summary=perfil.get("profile_summary"),
+    )
+
+    db.add(novo_perfil)
+    db.commit()
+    db.refresh(novo_perfil)
+
+    return {
+        "nome": novo_perfil.nome,
+        "cargo_atual": novo_perfil.cargo_atual,
+        "anos_experiencia": novo_perfil.anos_experiencia,
+        "skills": json.loads(novo_perfil.skills),
+        "nivel_ingles": novo_perfil.nivel_ingles,
+        "objetivo": novo_perfil.objetivo,
+        "raw_resume_text": novo_perfil.raw_resume_text,
+        "profile_json": novo_perfil.profile_json,
+        "profile_summary": novo_perfil.profile_summary,
+    }
+
+
+def obter_perfil_candidato_raw_db(db: Session) -> Dict | None:
+    perfil = db.query(CandidateProfileModel).first()
+
+    if not perfil:
+        return None
+
+    return {
+        "nome": perfil.nome,
+        "cargo_atual": perfil.cargo_atual,
+        "anos_experiencia": perfil.anos_experiencia,
+        "skills": json.loads(perfil.skills),
+        "nivel_ingles": perfil.nivel_ingles,
+        "objetivo": perfil.objetivo,
+        "raw_resume_text": perfil.raw_resume_text,
+        "profile_json": perfil.profile_json,
+        "profile_summary": perfil.profile_summary,
+    }
+
+
+def salvar_vaga_raw_db(db: Session, vaga: Dict) -> Dict:
+    nova_vaga = JobPostingModel(
+        titulo=vaga["titulo"],
+        empresa=vaga["empresa"],
+        localizacao=vaga.get("localizacao"),
+        origem=vaga.get("origem", "linkedin"),
+        url=vaga.get("url"),
+        descricao=vaga["descricao"],
+        raw_description=vaga.get("raw_description"),
+        job_json=vaga.get("job_json"),
+        job_summary=vaga.get("job_summary"),
+    )
+
+    db.add(nova_vaga)
+    db.commit()
+    db.refresh(nova_vaga)
+
+    return {
+        "id": nova_vaga.id,
+        "titulo": nova_vaga.titulo,
+        "empresa": nova_vaga.empresa,
+        "localizacao": nova_vaga.localizacao,
+        "origem": nova_vaga.origem,
+        "url": nova_vaga.url,
+        "descricao": nova_vaga.descricao,
+        "raw_description": nova_vaga.raw_description,
+        "job_json": nova_vaga.job_json,
+        "job_summary": nova_vaga.job_summary,
+        "criado_em": nova_vaga.criado_em,
+    }
+
+
+def obter_vaga_raw_db(db: Session, vaga_id: int) -> Dict | None:
+    vaga = db.query(JobPostingModel).filter(JobPostingModel.id == vaga_id).first()
+
+    if not vaga:
+        return None
+
+    return {
+        "id": vaga.id,
+        "titulo": vaga.titulo,
+        "empresa": vaga.empresa,
+        "localizacao": vaga.localizacao,
+        "origem": vaga.origem,
+        "url": vaga.url,
+        "descricao": vaga.descricao,
+        "raw_description": vaga.raw_description,
+        "job_json": vaga.job_json,
+        "job_summary": vaga.job_summary,
+        "criado_em": vaga.criado_em,
+    }
+
+def processar_perfil_raw_db(db: Session) -> Dict | None:
+    from app.ai.resume_parser import parse_resume_with_ai
+
+    perfil = db.query(CandidateProfileModel).first()
+
+    if not perfil or not perfil.raw_resume_text:
+        return None
+
+    resultado = parse_resume_with_ai(perfil.raw_resume_text)
+
+    perfil.profile_json = json.dumps(resultado["profile_json"], ensure_ascii=False)
+    perfil.profile_summary = resultado["profile_summary"]
+    perfil.last_ai_processed_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(perfil)
+
+    return {
+        "nome": perfil.nome,
+        "cargo_atual": perfil.cargo_atual,
+        "anos_experiencia": perfil.anos_experiencia,
+        "skills": json.loads(perfil.skills),
+        "nivel_ingles": perfil.nivel_ingles,
+        "objetivo": perfil.objetivo,
+        "raw_resume_text": perfil.raw_resume_text,
+        "profile_json": json.loads(perfil.profile_json) if perfil.profile_json else None,
+        "profile_summary": perfil.profile_summary,
+    }
+
+
+def processar_vaga_raw_db(db: Session, vaga_id: int) -> Dict | None:
+    from app.ai.job_parser import parse_job_with_ai
+    from datetime import datetime
+
+    vaga = db.query(JobPostingModel).filter(JobPostingModel.id == vaga_id).first()
+
+    if not vaga:
+        return None
+
+    texto_base = vaga.raw_description or vaga.descricao
+
+    if not texto_base:
+        return None
+
+    resultado = parse_job_with_ai(texto_base)
+
+    vaga.raw_description = texto_base
+    vaga.job_json = json.dumps(resultado["job_json"], ensure_ascii=False)
+    vaga.job_summary = resultado["job_summary"]
+    vaga.last_ai_processed_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(vaga)
+
+    return {
+        "id": vaga.id,
+        "titulo": vaga.titulo,
+        "empresa": vaga.empresa,
+        "localizacao": vaga.localizacao,
+        "origem": vaga.origem,
+        "url": vaga.url,
+        "descricao": vaga.descricao,
+        "raw_description": vaga.raw_description,
+        "job_json": json.loads(vaga.job_json) if vaga.job_json else None,
+        "job_summary": vaga.job_summary,
+        "criado_em": vaga.criado_em,
+    }
+
+def processar_match_semantico_db(db: Session, vaga_id: int) -> Dict | None:
+    from app.ai.match_engine import semantic_match_with_ai
+
+    perfil = db.query(CandidateProfileModel).first()
+    vaga = db.query(JobPostingModel).filter(JobPostingModel.id == vaga_id).first()
+
+    if not perfil or not vaga:
+        return None
+
+    if not perfil.profile_json or not vaga.job_json:
+        return None
+
+    profile_data = json.loads(perfil.profile_json)
+    job_data = json.loads(vaga.job_json)
+
+    resultado = semantic_match_with_ai(profile_data, job_data)
+
+    if job_data.get("ingles_exigido", False):
+        nivel_ingles = (perfil.nivel_ingles or "").lower()
+        resultado["ingles_compativel"] = nivel_ingles in [
+            "intermediario",
+            "intermediário",
+            "avancado",
+            "avançado",
+            "fluente"
+        ]
+
+        if resultado["ingles_compativel"]:
+            resultado["score"] = min(resultado["score"], 80) if resultado["score"] < 80 else resultado["score"]
+        else:
+            resultado["recomendacao"] = "Compatibilidade reduzida por exigência de inglês"
+
+    return resultado
