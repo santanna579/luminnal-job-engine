@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models import CandidateProfileModel
 from app.models_job import JobPostingModel
 from app.models_match import JobMatchModel
+from app.models_generated import GeneratedContentModel
 from datetime import datetime
 
 PALAVRAS_CHAVE_BASE = [
@@ -641,5 +642,153 @@ def processar_match_semantico_db(db: Session, vaga_id: int) -> Dict | None:
             resultado["score"] = min(resultado["score"], 80) if resultado["score"] < 80 else resultado["score"]
         else:
             resultado["recomendacao"] = "Compatibilidade reduzida por exigência de inglês"
+
+    return resultado
+
+def gerar_resumo_adaptado_db(db: Session, vaga_id: int) -> Dict | None:
+    from app.ai.resume_generator import gerar_resumo_e_carta
+    from app.ai.match_engine import semantic_match_with_ai
+    import json
+
+    perfil = db.query(CandidateProfileModel).first()
+    vaga = db.query(JobPostingModel).filter(JobPostingModel.id == vaga_id).first()
+
+    if not perfil or not vaga:
+        return None
+
+    if not perfil.profile_json or not vaga.job_json:
+        return None
+
+    profile_data = json.loads(perfil.profile_json)
+    job_data = json.loads(vaga.job_json)
+
+    match = semantic_match_with_ai(profile_data, job_data)
+
+    resultado = gerar_resumo_e_carta(
+        profile=perfil.__dict__,
+        job=vaga.__dict__,
+        match=match
+    )
+
+    return resultado
+
+def gerar_pdf_curriculo_db(db: Session, vaga_id: int) -> str | None:
+    from app.ai.resume_generator import gerar_resumo_e_carta
+    from app.ai.match_engine import semantic_match_with_ai
+    from app.utils.pdf_generator import gerar_pdf_curriculo
+    import json
+    import os
+
+    perfil = db.query(CandidateProfileModel).first()
+    vaga = db.query(JobPostingModel).filter(JobPostingModel.id == vaga_id).first()
+
+    if not perfil or not vaga:
+        return None
+
+    if not perfil.profile_json or not vaga.job_json:
+        return None
+
+    profile_data = json.loads(perfil.profile_json)
+    job_data = json.loads(vaga.job_json)
+
+    match = semantic_match_with_ai(profile_data, job_data)
+
+    resultado = gerar_resumo_e_carta(
+        profile=perfil.__dict__,
+        job=vaga.__dict__,
+        match=match
+    )
+
+    curriculo = resultado["curriculo_estruturado"]
+
+    os.makedirs("generated_files", exist_ok=True)
+    file_path = f"generated_files/curriculo_vaga_{vaga_id}.pdf"
+
+    gerar_pdf_curriculo(curriculo, file_path)
+
+    return file_path
+
+def gerar_e_salvar_conteudo_db(db: Session, vaga_id: int) -> Dict | None:
+    resultado = gerar_resumo_adaptado_db(db, vaga_id)
+
+    if not resultado:
+        return None
+
+    perfil = db.query(CandidateProfileModel).first()
+
+    if not perfil:
+        return None
+
+    novo_conteudo = GeneratedContentModel(
+        vaga_id=vaga_id,
+        nome_candidato=perfil.nome,
+        resumo_profissional_adaptado=resultado["resumo_profissional_adaptado"],
+        carta_apresentacao=resultado["carta_apresentacao"],
+    )
+
+    db.add(novo_conteudo)
+    db.commit()
+    db.refresh(novo_conteudo)
+
+    return {
+        "id": novo_conteudo.id,
+        "vaga_id": novo_conteudo.vaga_id,
+        "nome_candidato": novo_conteudo.nome_candidato,
+        "resumo_profissional_adaptado": novo_conteudo.resumo_profissional_adaptado,
+        "carta_apresentacao": novo_conteudo.carta_apresentacao,
+        "criado_em": novo_conteudo.criado_em,
+    }
+
+
+def listar_conteudos_gerados_db(db: Session) -> List[Dict]:
+    conteudos = db.query(GeneratedContentModel).order_by(GeneratedContentModel.id.desc()).all()
+
+    return [
+        {
+            "id": item.id,
+            "vaga_id": item.vaga_id,
+            "nome_candidato": item.nome_candidato,
+            "resumo_profissional_adaptado": item.resumo_profissional_adaptado,
+            "carta_apresentacao": item.carta_apresentacao,
+            "criado_em": item.criado_em,
+        }
+        for item in conteudos
+    ]
+
+def gerar_job_feed_db(db: Session) -> List[Dict]:
+    from app.ai.match_engine import semantic_match_with_ai
+    import json
+
+    perfil = db.query(CandidateProfileModel).first()
+
+    if not perfil or not perfil.profile_json:
+        return []
+
+    profile_data = json.loads(perfil.profile_json)
+
+    vagas = db.query(JobPostingModel).all()
+
+    resultado = []
+
+    for vaga in vagas:
+        if not vaga.job_json:
+            continue
+
+        job_data = json.loads(vaga.job_json)
+
+        match = semantic_match_with_ai(profile_data, job_data)
+
+        resultado.append({
+            "vaga_id": vaga.id,
+            "titulo": vaga.titulo,
+            "empresa": vaga.empresa,
+            "localizacao": vaga.localizacao,
+            "score": match.get("score", 0),
+            "nivel_aderencia": match.get("recomendacao", ""),
+            "resumo_match": match.get("resumo_match_semantico", "")
+        })
+
+    # ordenar por score DESC
+    resultado.sort(key=lambda x: x["score"], reverse=True)
 
     return resultado

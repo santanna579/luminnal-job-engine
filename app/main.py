@@ -1,7 +1,10 @@
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.database import engine, get_db
 from app.models import Base
+from app.models_generated import GeneratedContentModel
+from app.core.config import settings
 from app.services import (
     analisar_vaga_texto,
     analisar_com_perfil,
@@ -19,7 +22,12 @@ from app.services import (
     obter_vaga_raw_db,
     processar_perfil_raw_db,
     processar_vaga_raw_db,
-    processar_match_semantico_db
+    processar_match_semantico_db,
+    gerar_resumo_adaptado_db,
+    gerar_pdf_curriculo_db,
+    gerar_e_salvar_conteudo_db,
+    listar_conteudos_gerados_db,
+    gerar_job_feed_db
 )
 from app.models_job import JobPostingModel
 from app.models_match import JobMatchModel
@@ -38,9 +46,11 @@ from app.schemas import (
     JobRawResponse,
     CandidateProfileProcessedResponse,
     JobProcessedResponse,
-    SemanticMatchResponse
+    SemanticMatchResponse,
+    ResumeAdaptadoResponse,
+    GeneratedContentResponse,
+    JobFeedItem
 )
-from app.core.config import settings
 
 
 app = FastAPI(
@@ -216,3 +226,53 @@ def match_semantico(vaga_id: int, db: Session = Depends(get_db)):
         )
 
     return resultado
+
+@app.post("/gerar-resumo-adaptado/{vaga_id}", response_model=ResumeAdaptadoResponse)
+def gerar_resumo_adaptado(vaga_id: int, db: Session = Depends(get_db)):
+    resultado = gerar_resumo_adaptado_db(db, vaga_id)
+
+    if not resultado:
+        raise HTTPException(
+            status_code=404,
+            detail="Dados insuficientes para gerar resumo adaptado"
+        )
+
+    return resultado
+
+@app.get("/gerar-curriculo-pdf/{vaga_id}")
+def gerar_curriculo_pdf(vaga_id: int, db: Session = Depends(get_db)):
+    file_path = gerar_pdf_curriculo_db(db, vaga_id)
+
+    if not file_path:
+        raise HTTPException(
+            status_code=404,
+            detail="Dados insuficientes para gerar currículo em PDF"
+        )
+
+    return FileResponse(
+        path=file_path,
+        media_type="application/pdf",
+        filename=f"curriculo_vaga_{vaga_id}.pdf"
+    )
+
+@app.post("/gerar-e-salvar-conteudo/{vaga_id}", response_model=GeneratedContentResponse)
+def gerar_e_salvar_conteudo(vaga_id: int, db: Session = Depends(get_db)):
+    resultado = gerar_e_salvar_conteudo_db(db, vaga_id)
+
+    if not resultado:
+        raise HTTPException(
+            status_code=404,
+            detail="Dados insuficientes para gerar e salvar conteúdo"
+        )
+
+    return resultado
+
+
+@app.get("/conteudos-gerados", response_model=list[GeneratedContentResponse])
+def listar_conteudos_gerados(db: Session = Depends(get_db)):
+    return listar_conteudos_gerados_db(db)
+
+
+@app.get("/job-feed", response_model=list[JobFeedItem])
+def job_feed(db: Session = Depends(get_db)):
+    return gerar_job_feed_db(db)

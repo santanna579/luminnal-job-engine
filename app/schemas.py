@@ -181,3 +181,31 @@ class SemanticMatchResponse(BaseModel):
     ingles_compativel: bool
     recomendacao: str
     resumo_match_semantico: str
+
+
+class ResumeAdaptadoResponse(BaseModel):
+    resumo_profissional_adaptado: str
+    skills_para_destacar: List[str]
+    gaps_para_contornar: List[str]
+    carta_apresentacao: str
+
+
+class GeneratedContentResponse(BaseModel):
+    id: int
+    vaga_id: int
+    nome_candidato: str
+    resumo_profissional_adaptado: str
+    carta_apresentacao: str
+    criado_em: datetime
+
+    class Config:
+        from_attributes = True
+
+class JobFeedItem(BaseModel):
+    vaga_id: int
+    titulo: str
+    empresa: str
+    localizacao: str
+    score: int
+    nivel_aderencia: str
+    resumo_match: str
