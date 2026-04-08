@@ -57,7 +57,10 @@ from app.schemas import (
 app = FastAPI(
     title=settings.app_name,
     description="API inicial do motor de vagas da Luminnal",
-    version=settings.app_version
+    version=settings.app_version,
+    origins = [
+    "http://localhost:3000",
+    ]
 )
 
 app.add_middleware(
@@ -69,6 +72,10 @@ app.add_middleware(
 )
 
 Base.metadata.create_all(bind=engine)
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 @app.get("/")
 def read_root():
@@ -285,3 +292,7 @@ def listar_conteudos_gerados(db: Session = Depends(get_db)):
 @app.get("/job-feed", response_model=list[JobFeedItem])
 def job_feed(db: Session = Depends(get_db)):
     return gerar_job_feed_db(db)
+
+from app.api import profile_resume
+
+app.include_router(profile_resume.router)
