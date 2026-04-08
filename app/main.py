@@ -55,28 +55,21 @@ from app.schemas import (
 from app.api import profile_resume
 from fastapi.middleware.cors import CORSMiddleware
 
-
 app = FastAPI(
     title=settings.app_name,
     description="API inicial do motor de vagas da Luminnal",
     version=settings.app_version,
 )
 
-app.include_router(profile_resume.router)
-
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://jadix.luminnal.com.br",
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(profile_resume.router)
 
 Base.metadata.create_all(bind=engine)
 
