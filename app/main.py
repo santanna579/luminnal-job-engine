@@ -6,7 +6,7 @@ from app.database import engine, get_db
 from app.models import Base
 from app.models_generated import GeneratedContentModel
 from app.core.config import settings
-from app.services import (
+from app.services_old import (
     analisar_vaga_texto,
     analisar_com_perfil,
     salvar_perfil_candidato_db,
@@ -52,20 +52,27 @@ from app.schemas import (
     GeneratedContentResponse,
     JobFeedItem
 )
+from app.api import profile_resume
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI(
     title=settings.app_name,
     description="API inicial do motor de vagas da Luminnal",
     version=settings.app_version,
-    origins = [
-    "http://localhost:3000",
-    ]
 )
+
+app.include_router(profile_resume.router)
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://jadix.luminnal.com.br",
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -293,6 +300,3 @@ def listar_conteudos_gerados(db: Session = Depends(get_db)):
 def job_feed(db: Session = Depends(get_db)):
     return gerar_job_feed_db(db)
 
-from app.api import profile_resume
-
-app.include_router(profile_resume.router)
