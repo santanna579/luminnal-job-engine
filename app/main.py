@@ -32,7 +32,7 @@ from app.services_old import (
 )
 from app.models_job import JobPostingModel
 from app.models_match import JobMatchModel
-from app.schemas import (
+from app.schemas_old import (
     JobInput, 
     JobAnalysisResponse, 
     JobWithProfileInput, 
