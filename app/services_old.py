@@ -252,7 +252,10 @@ def obter_perfil_candidato_db(db: Session) -> Dict | None:
     }
 
 def salvar_vaga_db(db: Session, vaga: Dict) -> Dict:
+    from app.core.dependencies import get_current_user_id
+
     nova_vaga = JobPostingModel(
+        created_by_user_id=get_current_user_id(),
         titulo=vaga["titulo"],
         empresa=vaga["empresa"],
         localizacao=vaga.get("localizacao"),
@@ -492,7 +495,10 @@ def obter_perfil_candidato_raw_db(db: Session) -> Dict | None:
 
 
 def salvar_vaga_raw_db(db: Session, vaga: Dict) -> Dict:
+    from app.core.dependencies import get_current_user_id
+
     nova_vaga = JobPostingModel(
+        created_by_user_id=get_current_user_id(),
         titulo=vaga["titulo"],
         empresa=vaga["empresa"],
         localizacao=vaga.get("localizacao"),
@@ -757,6 +763,7 @@ def listar_conteudos_gerados_db(db: Session) -> List[Dict]:
 
 def gerar_job_feed_db(db: Session) -> List[Dict]:
     from app.ai.match_engine import semantic_match_with_ai
+    from app.services.dashboard_service import get_hot_score_map
     import json
 
     perfil = db.query(CandidateProfileModel).first()
@@ -765,8 +772,8 @@ def gerar_job_feed_db(db: Session) -> List[Dict]:
         return []
 
     profile_data = json.loads(perfil.profile_json)
-
     vagas = db.query(JobPostingModel).all()
+    hot_score_map = get_hot_score_map(db)
 
     resultado = []
 
@@ -775,8 +782,9 @@ def gerar_job_feed_db(db: Session) -> List[Dict]:
             continue
 
         job_data = json.loads(vaga.job_json)
-
         match = semantic_match_with_ai(profile_data, job_data)
+
+        hot_score = hot_score_map.get(vaga.id, 0)
 
         resultado.append({
             "vaga_id": vaga.id,
@@ -785,10 +793,17 @@ def gerar_job_feed_db(db: Session) -> List[Dict]:
             "localizacao": vaga.localizacao,
             "score": match.get("score", 0),
             "nivel_aderencia": match.get("recomendacao", ""),
-            "resumo_match": match.get("resumo_match_semantico", "")
+            "resumo_match": match.get("resumo_match_semantico", ""),
+            "hot_score": hot_score,
+            "is_hot": hot_score >= 70,
         })
 
-    # ordenar por score DESC
-    resultado.sort(key=lambda x: x["score"], reverse=True)
+    resultado.sort(
+        key=lambda x: (
+            x["hot_score"],
+            x["score"],
+        ),
+        reverse=True
+    )
 
     return resultado

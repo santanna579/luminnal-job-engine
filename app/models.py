@@ -20,3 +20,16 @@ class CandidateProfileModel(Base):
     profile_summary = Column(Text, nullable=True)
     last_ai_processed_at = Column(DateTime, nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
+
+class UserProfileModel(Base):
+    __tablename__ = "user_profile"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, default=1)
+
+    profile_json = Column(Text, nullable=False)
+    resume_filename = Column(String(255), nullable=True)
+
+    snapshot_type = Column(String(20), nullable=False)  # active | previous
+
+    created_at = Column(DateTime, default=datetime.utcnow)
