@@ -88,6 +88,13 @@ from app.services.dashboard_service import (
 from app.core.dependencies import get_current_user_id
 from app.api.jobs import router as jobs_router
 from app.services.job_service import list_jobs_catalog_db
+from app.services.job_score_service import get_job_feed_with_score_db
+from app.services.job_match_analysis_service import (
+    analyze_job_match_on_demand_db,
+    get_user_analysis_usage_db,
+)
+
+from app.services.adapted_resume_service import gerar_resumo_adaptado_db
 
 app = FastAPI(
     title=settings.app_name,
@@ -291,13 +298,27 @@ def match_semantico(vaga_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/gerar-resumo-adaptado/{vaga_id}", response_model=ResumeAdaptadoResponse)
-def gerar_resumo_adaptado(vaga_id: int, db: Session = Depends(get_db)):
-    resultado = gerar_resumo_adaptado_db(db, vaga_id)
+def gerar_resumo_adaptado(
+    vaga_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    resultado = gerar_resumo_adaptado_db(
+        db=db,
+        vaga_id=vaga_id,
+        user_id=user_id,
+    )
 
     if not resultado:
         raise HTTPException(
             status_code=404,
-            detail="Dados insuficientes para gerar resumo adaptado"
+            detail="Não foi possível gerar resumo adaptado para esta vaga."
+        )
+
+    if resultado.get("error") == "MONTHLY_LIMIT_REACHED":
+        raise HTTPException(
+            status_code=403,
+            detail=resultado,
         )
 
     return resultado
@@ -501,6 +522,7 @@ def job_feed(
     db: Session = Depends(get_db),
 ):
     return list_jobs_catalog_db(db=db)
+    
 
 #@app.post("/jobs/{job_id}/apply")
 #def apply_to_job(
@@ -521,3 +543,44 @@ def job_feed(
 #        "application_id": result.id,
 #        "status": result.status,
 #    }
+
+@app.get("/job-feed-with-score")
+def get_job_feed_with_score(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    return get_job_feed_with_score_db(db, user_id)
+
+@app.post("/jobs/{job_id}/analyze-match")
+def analyze_job_match_on_demand(
+    job_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    result = analyze_job_match_on_demand_db(
+        db=db,
+        user_id=user_id,
+        job_id=job_id,
+    )
+
+    if result.get("error") == "PROFILE_NOT_FOUND":
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    if result.get("error") == "JOB_NOT_FOUND":
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    if result.get("error") == "MONTHLY_LIMIT_REACHED":
+        raise HTTPException(status_code=403, detail=result)
+
+    return result
+
+
+@app.get("/jobs/match-usage")
+def get_job_match_usage(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    return get_user_analysis_usage_db(db=db, user_id=user_id)
+
+from app.api.job_intelligence import router as job_intelligence_router
+app.include_router(job_intelligence_router)
